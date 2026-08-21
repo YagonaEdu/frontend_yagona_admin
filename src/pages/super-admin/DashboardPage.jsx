@@ -147,8 +147,8 @@ export default function SuperDashboardPage() {
         subtitle="Обзор клиентов, лицензий и быстрые действия по учебным центрам."
         actions={
           <div className="actions">
-            <Link className="btn secondary" to="/super/licenses">
-              Лицензии
+            <Link className="btn secondary" to="/super/plans">
+              Тарифы
             </Link>
             <Link className="btn" to="/super/centers?new=1">
               Подключить центр
@@ -169,6 +169,35 @@ export default function SuperDashboardPage() {
           <StatCard label="Оплачено" value={paid} hint={`${trial} пробных`} />
           <StatCard label="Риск" value={expired + suspended} hint="истекло + отключено" />
           <StatCard label="MRR" value={money(mrr)} hint="сумма тарифов / мес" />
+        </div>
+      </section>
+
+      <section className="section-block">
+        <div className="section-head">
+          <h3>Тарифные планы</h3>
+          <Link className="text-action" to="/super/plans">
+            Открыть тарифы
+          </Link>
+        </div>
+        <div className="plan-board">
+          {[
+            { key: "trial", label: "Пробный", hint: "14 дней" },
+            { key: "start", label: "Старт", hint: "Базовый" },
+            { key: "business", label: "Бизнес", hint: "Полный" },
+          ].map((plan) => (
+            <Link key={plan.key} className="plan-card" to="/super/plans">
+              <span className="plan-card-label">{plan.label}</span>
+              <strong>{tenants.filter((row) => row.plan === plan.key).length}</strong>
+              <span className="muted">{plan.hint}</span>
+            </Link>
+          ))}
+          <Link className="plan-card" to="/super/centers">
+            <span className="plan-card-label">CRM + приложение</span>
+            <strong>
+              {tenants.filter((row) => row.includes_crm && row.includes_app).length}
+            </strong>
+            <span className="muted">полный пакет</span>
+          </Link>
         </div>
       </section>
 
@@ -196,17 +225,17 @@ export default function SuperDashboardPage() {
             <strong>Новый учебный центр</strong>
             <span>Онбординг: юр. данные, владелец, договор</span>
           </Link>
-          <Link className="quick-action" to="/super/centers">
-            <strong>Все клиенты</strong>
-            <span>Карточки, редактирование, документы</span>
+          <Link className="quick-action" to="/super/plans">
+            <strong>Тарифы</strong>
+            <span>Создание и каталог планов</span>
           </Link>
-          <Link className="quick-action" to="/super/licenses">
-            <strong>Лицензии и тарифы</strong>
-            <span>Продление и статусы оплаты</span>
+          <Link className="quick-action" to="/super/wallet">
+            <strong>Кошелёк</strong>
+            <span>MRR и доход по центрам</span>
           </Link>
-          <Link className="quick-action" to="/super/students">
-            <strong>База учеников</strong>
-            <span>Общий реестр по всем центрам</span>
+          <Link className="quick-action" to="/super/analytics">
+            <strong>Аналитика</strong>
+            <span>Центры, ученики, тарифы</span>
           </Link>
         </div>
       </section>

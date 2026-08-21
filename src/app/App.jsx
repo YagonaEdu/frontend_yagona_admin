@@ -19,7 +19,10 @@ import SettingsPage from "@/pages/education-admin/SettingsPage";
 import SuperDashboardPage from "@/pages/super-admin/DashboardPage";
 import CentersPage from "@/pages/super-admin/CentersPage";
 import PlatformStudentsPage from "@/pages/super-admin/StudentsPage";
+import PlansPage from "@/pages/super-admin/PlansPage";
 import LicensesPage from "@/pages/super-admin/LicensesPage";
+import WalletPage from "@/pages/super-admin/WalletPage";
+import AnalyticsPage from "@/pages/super-admin/AnalyticsPage";
 import { APP_MODES } from "@/constants";
 import { clearSession, setSession } from "@/services/api/client";
 import {
@@ -37,21 +40,21 @@ import {
 function RootRedirect({ session }) {
   const home = resolveAuthedHome(session);
 
+  // Only wipe a fully-loaded but unusable session (not mid-login).
   useEffect(() => {
-    if (!home) clearSession();
-  }, [home]);
+    if (home) return;
+    if (!session.access || !session.user) return;
+    if (session.user.is_superuser) return;
+    if (!Array.isArray(session.memberships) || session.memberships.length > 0) return;
+    clearSession();
+  }, [home, session.access, session.user, session.memberships]);
 
   if (home) return <Navigate to={home} replace />;
-  return null;
+  return <Navigate to="/login" replace />;
 }
 
 function AuthedLoginRedirect({ session }) {
   const home = resolveAuthedHome(session);
-
-  useEffect(() => {
-    if (!home || home === "/login") clearSession();
-  }, [home]);
-
   if (home && home !== "/login") return <Navigate to={home} replace />;
   return null;
 }
@@ -160,9 +163,23 @@ export default function App() {
           }
         />
         <Route
+          path="/super/plans"
+          element={canAccessSuperAdmin(session) ? <PlansPage /> : <Navigate to="/login" replace />}
+        />
+        <Route
           path="/super/licenses"
           element={
             canAccessSuperAdmin(session) ? <LicensesPage /> : <Navigate to="/login" replace />
+          }
+        />
+        <Route
+          path="/super/wallet"
+          element={canAccessSuperAdmin(session) ? <WalletPage /> : <Navigate to="/login" replace />}
+        />
+        <Route
+          path="/super/analytics"
+          element={
+            canAccessSuperAdmin(session) ? <AnalyticsPage /> : <Navigate to="/login" replace />
           }
         />
       </Route>

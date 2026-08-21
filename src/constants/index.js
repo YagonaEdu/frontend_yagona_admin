@@ -133,5 +133,8 @@ export const SUPER_ADMIN_NAV = [
   { to: "/super", label: "Обзор", end: true, group: "Платформа" },
   { to: "/super/centers", label: "Центры", group: "Платформа" },
   { to: "/super/students", label: "Ученики", group: "Платформа" },
-  { to: "/super/licenses", label: "Лицензии", group: "Платформа" },
+  { to: "/super/plans", label: "Тарифы", group: "Биллинг" },
+  { to: "/super/licenses", label: "Лицензии", group: "Биллинг" },
+  { to: "/super/wallet", label: "Кошелёк", group: "Биллинг" },
+  { to: "/super/analytics", label: "Аналитика", group: "Аналитика" },
 ];

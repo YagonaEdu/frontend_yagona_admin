@@ -1,7 +1,4 @@
-const API_ROOT = String(import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000/api/v1").replace(
-  /\/+$/,
-  "",
-);
+const API_ROOT = String(import.meta.env.VITE_API_BASE || "/api/v1").replace(/\/+$/, "");
 
 function apiUrl(path) {
   const suffix = `/${String(path || "").replace(/^\/+/, "")}`;
@@ -88,7 +85,7 @@ function serializeSessionValue(value) {
   return typeof value === "string" ? value : JSON.stringify(value);
 }
 
-export function setSession(partial) {
+function writeSession(partial, { emit = true } = {}) {
   let changed = false;
   for (const [key, value] of Object.entries(partial)) {
     const next = serializeSessionValue(value);
@@ -105,7 +102,17 @@ export function setSession(partial) {
       changed = true;
     }
   }
-  if (changed) window.dispatchEvent(new Event("yagona-session"));
+  if (changed && emit) window.dispatchEvent(new Event("yagona-session"));
+  return changed;
+}
+
+export function setSession(partial) {
+  writeSession(partial, { emit: true });
+}
+
+/** Write session keys without notifying React (used mid-login). */
+export function setSessionSilent(partial) {
+  writeSession(partial, { emit: false });
 }
 
 export function clearSession() {

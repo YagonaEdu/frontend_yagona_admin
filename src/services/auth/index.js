@@ -1,5 +1,11 @@
 import { APP_MODES, ROLES } from "@/constants";
-import { api, clearSession, getSession, setSession } from "@/services/api/client";
+import {
+  api,
+  clearSession,
+  getSession,
+  setSession,
+  setSessionSilent,
+} from "@/services/api/client";
 
 export async function login(identifier, password) {
   const tokens = await api.post(
@@ -8,17 +14,21 @@ export async function login(identifier, password) {
     { tenant: false },
   );
 
-  setSession({
+  // Keep tokens available for /me/tenants without flipping the UI into "authed"
+  // mid-flight (that used to race with AuthedLoginRedirect → clearSession).
+  setSessionSilent({
     access: tokens.access,
     refresh: tokens.refresh,
-    user: tokens.user,
-    memberships: [],
-    tenantId: "",
-    tenantSlug: "",
-    mode: "",
   });
 
-  const memberships = await api.get("/me/tenants", { tenant: false });
+  let memberships;
+  try {
+    memberships = await api.get("/me/tenants", { tenant: false });
+  } catch (err) {
+    clearSession();
+    throw err;
+  }
+
   const staffMemberships = (memberships || []).filter((item) => item.role !== ROLES.STUDENT);
   const isSuper = Boolean(tokens.user?.is_superuser);
 
@@ -30,6 +40,9 @@ export async function login(identifier, password) {
   if (isSuper) {
     const membership = staffMemberships[0] || null;
     setSession({
+      access: tokens.access,
+      refresh: tokens.refresh,
+      user: tokens.user,
       memberships: staffMemberships,
       tenantId: membership?.tenant_id || "",
       tenantSlug: membership?.tenant_slug || "",
@@ -40,6 +53,9 @@ export async function login(identifier, password) {
 
   const membership = staffMemberships[0];
   setSession({
+    access: tokens.access,
+    refresh: tokens.refresh,
+    user: tokens.user,
     memberships: staffMemberships,
     tenantId: membership.tenant_id,
     tenantSlug: membership.tenant_slug || "",

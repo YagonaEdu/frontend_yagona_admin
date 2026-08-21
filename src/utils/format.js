@@ -82,11 +82,10 @@ export function toIso(localValue) {
 export function mediaUrl(path) {
   if (!path) return "";
   if (/^https?:\/\//i.test(path)) return path;
-  const apiBase = String(import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000/api/v1").replace(
-    /\/+$/,
-    "",
-  );
-  const origin = apiBase.replace(/\/api\/v1$/i, "");
+  const apiBase = String(import.meta.env.VITE_API_BASE || "/api/v1").replace(/\/+$/, "");
+  const origin = /^https?:\/\//i.test(apiBase)
+    ? apiBase.replace(/\/api\/v1$/i, "")
+    : "";
   return `${origin}${path.startsWith("/") ? path : `/${path}`}`;
 }
 

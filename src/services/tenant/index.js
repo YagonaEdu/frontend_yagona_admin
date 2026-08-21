@@ -2,6 +2,23 @@ import { APP_MODES } from "@/constants";
 import { api, getSession, setSession } from "@/services/api/client";
 import { results } from "@/utils/format";
 
+export async function listPlatformPlans(params = "") {
+  const query = params ? `?${params}` : "?page_size=100";
+  return results(await api.get(`/platform/plans${query}`, { tenant: false }));
+}
+
+export async function createPlatformPlan(payload) {
+  return api.post("/platform/plans", payload, { tenant: false });
+}
+
+export async function updatePlatformPlan(id, payload) {
+  return api.patch(`/platform/plans/${id}`, payload, { tenant: false });
+}
+
+export async function deletePlatformPlan(id) {
+  return api.del(`/platform/plans/${id}`, { tenant: false });
+}
+
 export async function listPlatformTenants(params = "") {
   const query = params ? `?${params}` : "?page_size=100";
   return results(await api.get(`/platform/tenants${query}`, { tenant: false }));
