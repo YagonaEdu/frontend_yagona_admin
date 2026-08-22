@@ -1,4 +1,6 @@
+import { useEffect, useRef, useState } from "react";
 import { STATUS_LABELS } from "@/constants";
+import { formatMoneyInput, normalizePriceDigits } from "@/utils/format";
 
 export function Banner({ children, tone = "error" }) {
   if (!children) return null;
@@ -12,6 +14,21 @@ export function Field({ label, children }) {
       <span className="field-label">{label}</span>
       {children}
     </label>
+  );
+}
+
+export function MoneyInput({ value, onChange, placeholder = "900,000", className = "", ...rest }) {
+  return (
+    <input
+      {...rest}
+      type="text"
+      inputMode="numeric"
+      autoComplete="off"
+      className={`money-input ${className}`.trim()}
+      value={formatMoneyInput(value)}
+      placeholder={placeholder}
+      onChange={(event) => onChange?.(normalizePriceDigits(event.target.value))}
+    />
   );
 }
 
@@ -143,5 +160,69 @@ export function TextAction({ children, onClick, type = "button" }) {
     <button className="text-action" type={type} onClick={onClick}>
       {children}
     </button>
+  );
+}
+
+export function RowActionsMenu({ items, align = "end" }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef(null);
+  const visible = (items || []).filter((item) => !item.hidden);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    function close(event) {
+      if (!rootRef.current?.contains(event.target)) setOpen(false);
+    }
+    function onKey(event) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  if (!visible.length) return null;
+
+  return (
+    <div
+      className={`row-actions row-actions-${align}`}
+      ref={rootRef}
+      onClick={(event) => event.stopPropagation()}
+    >
+      <button
+        type="button"
+        className="row-actions-trigger"
+        aria-label="Действия"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        onClick={() => setOpen((value) => !value)}
+      >
+        ⋯
+      </button>
+      {open ? (
+        <div className="row-actions-menu" role="menu">
+          {visible.map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              role="menuitem"
+              className={`row-actions-item ${item.danger ? "is-danger" : ""}`}
+              disabled={item.disabled}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={(event) => {
+                event.stopPropagation();
+                setOpen(false);
+                item.onClick?.();
+              }}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }

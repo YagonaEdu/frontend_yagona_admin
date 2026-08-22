@@ -702,8 +702,12 @@ export default function CentersPage() {
           </div>
         }
       />
-      <Banner>{error}</Banner>
-      <Banner tone="ok">{info}</Banner>
+      {!openWizard && !tariffTarget ? (
+        <>
+          <Banner>{error}</Banner>
+          <Banner tone="ok">{info}</Banner>
+        </>
+      ) : null}
 
       <section className="section-block">
         <div className="section-head">
@@ -964,6 +968,7 @@ export default function CentersPage() {
             </ol>
 
             <div className="sheet-body">
+              <Banner>{error}</Banner>
               {step === 1 ? (
                 <div className="grid cols-2" style={{ gap: 12 }}>
                   <Field label="Название центра *">
@@ -1231,6 +1236,7 @@ export default function CentersPage() {
               </button>
             </div>
             <div className="sheet-body">
+              <Banner>{error}</Banner>
               <div className="plan-pick-grid">
                 {planChoices.map((plan) => (
                   <button

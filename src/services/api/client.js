@@ -15,21 +15,38 @@ export class ApiError extends Error {
 
 function formatMessage(status, payload) {
   if (!payload) return `Ошибка ${status}`;
+  const message = payload.message || `Ошибка ${status}`;
+  if (message && !String(message).includes("ErrorDetail")) return message;
   const details = flattenDetails(payload.details);
-  if (details) return `${payload.message || "Ошибка"}: ${details}`;
-  return payload.message || `Ошибка ${status}`;
+  return details || message || `Ошибка ${status}`;
 }
 
 function flattenDetails(details) {
   if (!details) return "";
   if (typeof details === "string") return details;
-  if (Array.isArray(details)) return details.map(String).join(", ");
+  if (Array.isArray(details)) return details.map((item) => flattenDetails(item)).filter(Boolean).join(", ");
   if (typeof details === "object") {
     return Object.entries(details)
-      .map(([key, value]) => `${key}: ${flattenDetails(value)}`)
+      .map(([key, value]) => {
+        const text = flattenDetails(value);
+        if (!text) return "";
+        return key === "detail" || key === "non_field_errors" ? text : `${fieldLabel(key)}: ${text}`;
+      })
+      .filter(Boolean)
       .join("; ");
   }
   return String(details);
+}
+
+function fieldLabel(key) {
+  const labels = {
+    paid_amount: "Сумма выплаты",
+    accrued_amount: "Начисление",
+    membership: "Сотрудник",
+    period: "Период",
+    status: "Статус",
+  };
+  return labels[key] || key;
 }
 
 async function parseBody(response) {

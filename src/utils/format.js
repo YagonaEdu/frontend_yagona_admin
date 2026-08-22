@@ -20,6 +20,30 @@ export function money(value, currency = "UZS") {
   return `${formatted} ${currency}`;
 }
 
+export function normalizePriceDigits(value) {
+  if (value == null || value === "") return "";
+  const str = String(value).trim();
+  if (!str) return "";
+  if (/^\d+(\.\d+)?$/.test(str)) {
+    const amount = Math.floor(Number(str));
+    return amount > 0 ? String(amount) : "";
+  }
+  const digits = str.replace(/\D/g, "");
+  if (!digits) return "";
+  return digits.replace(/^0+/, "") || "0";
+}
+
+export function formatMoneyInput(value) {
+  const raw = normalizePriceDigits(value);
+  if (!raw) return "";
+  return Number(raw).toLocaleString("en-US");
+}
+
+export function priceToApi(value) {
+  const raw = normalizePriceDigits(value);
+  return raw || "0";
+}
+
 export function formatDate(value) {
   if (!value) return "—";
   const raw = String(value).includes("T") ? value : `${value}T12:00:00`;

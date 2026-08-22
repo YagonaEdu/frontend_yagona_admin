@@ -13,6 +13,7 @@ import GroupsPage from "@/pages/education-admin/GroupsPage";
 import SchedulePage from "@/pages/education-admin/SchedulePage";
 import AttendancePage from "@/pages/education-admin/AttendancePage";
 import BillingPage from "@/pages/education-admin/BillingPage";
+import FinancePage from "@/pages/education-admin/FinancePage";
 import StaffPage from "@/pages/education-admin/StaffPage";
 import NotificationsPage from "@/pages/education-admin/NotificationsPage";
 import SettingsPage from "@/pages/education-admin/SettingsPage";
@@ -196,6 +197,7 @@ export default function App() {
         <Route path="schedule" element={<SchedulePage />} />
         <Route path="attendance" element={<AttendancePage />} />
         <Route path="billing" element={<BillingPage />} />
+        <Route path="finance" element={<FinancePage />} />
         <Route path="staff" element={<StaffPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="settings" element={<SettingsPage />} />

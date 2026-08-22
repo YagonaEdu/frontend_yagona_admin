@@ -96,6 +96,7 @@ export const EDUCATION_NAV = {
     { segment: "schedule", label: "Расписание", group: "Учёба" },
     { segment: "attendance", label: "Посещаемость", group: "Учёба" },
     { segment: "billing", label: "Биллинг", group: "Финансы" },
+    { segment: "finance", label: "Финансы", group: "Финансы" },
     { segment: "staff", label: "Команда", group: "Управление" },
     { segment: "notifications", label: "Уведомления", group: "Управление" },
     { segment: "settings", label: "Настройки", group: "Управление" },
@@ -109,6 +110,7 @@ export const EDUCATION_NAV = {
     { segment: "schedule", label: "Расписание", group: "Учёба" },
     { segment: "attendance", label: "Посещаемость", group: "Учёба" },
     { segment: "billing", label: "Биллинг", group: "Финансы" },
+    { segment: "finance", label: "Финансы", group: "Финансы" },
     { segment: "staff", label: "Команда", group: "Управление" },
     { segment: "notifications", label: "Уведомления", group: "Управление" },
     { segment: "settings", label: "Настройки", group: "Управление" },
@@ -117,6 +119,7 @@ export const EDUCATION_NAV = {
     { segment: "", label: "Обзор", end: true, group: "Главное" },
     { segment: "students", label: "Ученики", group: "Главное" },
     { segment: "billing", label: "Биллинг", group: "Финансы" },
+    { segment: "finance", label: "Финансы", group: "Финансы" },
     { segment: "settings", label: "Настройки", group: "Управление" },
   ],
   teacher: [

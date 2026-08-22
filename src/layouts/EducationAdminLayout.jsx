@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Navigate, Outlet, useNavigate, useParams } from "react-router-dom";
 import { BrandMark } from "@/components/brand";
 import { GroupedNav } from "@/components/layout/GroupedNav";
-import { Avatar, TextAction } from "@/components/ui";
+import { Avatar } from "@/components/ui";
 import { APP_MODES, EDUCATION_NAV, ROLE_LABELS } from "@/constants";
 import { setSession } from "@/services/api/client";
 import { enterSuperAdmin } from "@/services/tenant";
@@ -72,49 +72,60 @@ export default function EducationAdminLayout({ session, onLogout }) {
         </div>
         <GroupedNav items={links} />
         <div className="sidebar-foot">
-          <div className="person">
-            <Avatar name={session.user?.name || session.user?.email} />
-            <div className="person-copy">
-              <strong>{session.user?.name || session.user?.email}</strong>
-              <div>{session.user?.email}</div>
+          <div className="sidebar-account">
+            <div className="sidebar-account-main">
+              <Avatar name={session.user?.name || session.user?.email} />
+              <div className="sidebar-account-copy">
+                <strong>{session.user?.name || session.user?.email || "Пользователь"}</strong>
+                <span>{session.user?.email || session.user?.phone || "—"}</span>
+                {role ? (
+                  <em className="sidebar-account-role">{ROLE_LABELS[role] || role}</em>
+                ) : null}
+              </div>
+            </div>
+            {session.memberships?.length > 1 ? (
+              <label className="tenant-switch">
+                <span>Учебный центр</span>
+                <select
+                  value={membership?.tenant_id || session.tenantId}
+                  onChange={(event) => {
+                    const next = session.memberships.find(
+                      (item) => String(item.tenant_id) === event.target.value,
+                    );
+                    if (next?.tenant_slug) navigate(educationHomePath(next.tenant_slug));
+                  }}
+                  aria-label="Учебный центр"
+                >
+                  {session.memberships.map((item) => (
+                    <option key={item.tenant_id} value={item.tenant_id}>
+                      {item.tenant_name} ({ROLE_LABELS[item.role] || item.role})
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            <div className="sidebar-account-actions">
+              {session.user?.is_superuser ? (
+                <button
+                  type="button"
+                  className="sidebar-account-btn is-soft"
+                  onClick={() => {
+                    enterSuperAdmin();
+                    navigate("/super");
+                  }}
+                >
+                  Кабинет Yagona
+                </button>
+              ) : null}
+              <button type="button" className="sidebar-account-btn is-logout" onClick={onLogout}>
+                Выйти
+              </button>
             </div>
           </div>
-          {session.memberships?.length > 1 ? (
-            <label className="tenant-switch">
-              <span>Учебный центр</span>
-              <select
-                value={membership?.tenant_id || session.tenantId}
-                onChange={(event) => {
-                  const next = session.memberships.find(
-                    (item) => String(item.tenant_id) === event.target.value,
-                  );
-                  if (next?.tenant_slug) navigate(educationHomePath(next.tenant_slug));
-                }}
-                aria-label="Учебный центр"
-              >
-                {session.memberships.map((item) => (
-                  <option key={item.tenant_id} value={item.tenant_id}>
-                    {item.tenant_name} ({ROLE_LABELS[item.role] || item.role})
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-          {session.user?.is_superuser ? (
-            <TextAction
-              onClick={() => {
-                enterSuperAdmin();
-                navigate("/super");
-              }}
-            >
-              Кабинет Yagona
-            </TextAction>
-          ) : null}
-          <TextAction onClick={onLogout}>Выйти</TextAction>
         </div>
       </aside>
       <main className="main">
-        <div className="main-stage">
+        <div className="main-stage page-container">
           <Outlet key={session.tenantId} />
         </div>
       </main>
