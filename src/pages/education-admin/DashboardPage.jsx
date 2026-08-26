@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Banner,
@@ -11,6 +11,7 @@ import {
 import { ROLE_LABELS, STATUS_LABELS } from "@/constants";
 import { api, getSession } from "@/services/api/client";
 import { currentMembership } from "@/services/auth";
+import { isAdminRole } from "@/utils/roleAccess";
 import {
   formatDate,
   formatDay,
@@ -19,6 +20,9 @@ import {
   results,
   today,
 } from "@/utils/format";
+import PageFallback from "@/components/layout/PageFallback";
+
+const ReceptionDashboard = lazy(() => import("./resepshen_yagona"));
 
 const PAID_STATUSES = new Set(["paid", "void", "canceled", "cancelled"]);
 
@@ -53,6 +57,18 @@ function isOverdueInvoice(row) {
 }
 
 export default function DashboardPage() {
+  const role = currentMembership(getSession())?.role || "";
+  if (isAdminRole(role)) {
+    return (
+      <Suspense fallback={<PageFallback label="Загрузка рабочего стола…" />}>
+        <ReceptionDashboard />
+      </Suspense>
+    );
+  }
+  return <OwnerStyleDashboard />;
+}
+
+function OwnerStyleDashboard() {
   const session = getSession();
   const membership = currentMembership(session);
   const role = membership?.role || "";
@@ -77,15 +93,16 @@ export default function DashboardPage() {
     setLoading(true);
     try {
       const tasks = [
-        api.get("/dashboard/summary"),
-        api.get("/lessons?page_size=100"),
-        api.get("/groups?page_size=100"),
-        api.get("/students?page_size=100"),
-        api.get("/invoices?page_size=100"),
+        api.get("/dashboard/summary", { cache: true }),
+        api.get("/lessons?page_size=100", { cache: true }),
+        api.get("/groups?page_size=100", { cache: true }),
+        api.get("/students?page_size=100", { cache: true }),
+        api.get("/invoices?page_size=100", { cache: true }),
       ];
-      if (showCrm) tasks.push(api.get("/leads?page_size=100"));
-      if (showFinance) tasks.push(api.get("/payments?page_size=100").catch(() => ({ results: [] })));
-
+      if (showCrm) tasks.push(api.get("/leads?page_size=100", { cache: true }));
+      if (showFinance) {
+        tasks.push(api.get("/payments?page_size=100", { cache: true }).catch(() => ({ results: [] })));
+      }
       const settled = await Promise.all(tasks);
       setSummary(settled[0]);
       setLessons(results(settled[1]));

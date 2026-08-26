@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { STATUS_LABELS } from "@/constants";
-import { formatMoneyInput, normalizePriceDigits } from "@/utils/format";
+import {
+  formatMoneyInput,
+  formatQueryWithPhone,
+  formatUzPhone,
+  formatUzPhoneLocal,
+  moneyInputSuffix,
+  normalizePriceDigits,
+  toApiPhone,
+  uzPhoneLocalDigits,
+} from "@/utils/format";
 
 export function Banner({ children, tone = "error" }) {
   if (!children) return null;
@@ -17,17 +26,186 @@ export function Field({ label, children }) {
   );
 }
 
-export function MoneyInput({ value, onChange, placeholder = "900,000", className = "", ...rest }) {
+export function MoneyInput({
+  value,
+  onChange,
+  placeholder = "300 000",
+  currency = "UZS",
+  className = "",
+  required = false,
+  ...rest
+}) {
+  const display = formatMoneyInput(value);
+  const hasValue = Boolean(normalizePriceDigits(value));
+  const suffix = moneyInputSuffix(currency);
+
+  function commit(nextRaw) {
+    onChange?.(normalizePriceDigits(nextRaw));
+  }
+
+  function handleChange(event) {
+    commit(event.target.value);
+  }
+
+  function handlePaste(event) {
+    const text = event.clipboardData?.getData("text") || "";
+    if (!text) return;
+    event.preventDefault();
+    commit(text);
+  }
+
+  function handleClear(event) {
+    event.preventDefault();
+    commit("");
+  }
+
+  return (
+    <div className={`money-field ${hasValue ? "has-value" : ""} ${className}`.trim()}>
+      <input
+        {...rest}
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        className="money-input"
+        value={display}
+        placeholder={placeholder}
+        onChange={handleChange}
+        onPaste={handlePaste}
+        aria-label="Сумма"
+      />
+      {hasValue ? (
+        <button
+          type="button"
+          className="money-field-clear"
+          aria-label="Очистить сумму"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={handleClear}
+        >
+          ×
+        </button>
+      ) : null}
+      <span className="money-field-suffix">{suffix}</span>
+      {required && !hasValue ? (
+        <input
+          tabIndex={-1}
+          aria-hidden="true"
+          className="person-search-required"
+          value=""
+          required
+          onChange={() => {}}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+export function PhoneInput({
+  value,
+  onChange,
+  placeholder = "90 123 45 67",
+  className = "",
+  required = false,
+  onApiChange,
+  ...rest
+}) {
+  const [focused, setFocused] = useState(false);
+  const localDigits = uzPhoneLocalDigits(value);
+  const localValue = formatUzPhoneLocal(value);
+  const hasPhone = Boolean(localDigits);
+  const maskGuide = "00 000 00 00";
+  const showGuide = focused || hasPhone;
+
+  function commit(local) {
+    const nextLocal = String(local || "").replace(/\D/g, "").slice(0, 9);
+    const formatted = nextLocal ? formatUzPhone(`998${nextLocal}`) : "";
+    onChange?.(formatted);
+    onApiChange?.(toApiPhone(formatted));
+  }
+
+  function handleChange(event) {
+    // Accept paste of +998… / 998… / raw local digits
+    commit(uzPhoneLocalDigits(event.target.value));
+  }
+
+  function handlePaste(event) {
+    const text = event.clipboardData?.getData("text") || "";
+    if (!text) return;
+    event.preventDefault();
+    commit(uzPhoneLocalDigits(text));
+  }
+
+  function handleClear(event) {
+    event.preventDefault();
+    commit("");
+  }
+
+  return (
+    <div
+      className={`phone-field ${hasPhone ? "has-value" : ""} ${focused ? "is-focused" : ""} ${className}`.trim()}
+    >
+      <span className="phone-field-prefix" aria-hidden="true">
+        <span className="phone-field-flag">UZ</span>
+        <span className="phone-field-code">+998</span>
+      </span>
+      <div className="phone-field-body">
+        {showGuide ? (
+          <span className="phone-field-ghost" aria-hidden="true">
+            <span className="phone-field-ghost-filled">{localValue}</span>
+            <span className="phone-field-ghost-rest">{maskGuide.slice(localValue.length)}</span>
+          </span>
+        ) : null}
+        <input
+          {...rest}
+          type="tel"
+          inputMode="numeric"
+          autoComplete="tel"
+          value={localValue}
+          placeholder={focused ? "" : placeholder}
+          onChange={handleChange}
+          onPaste={handlePaste}
+          onFocus={(event) => {
+            setFocused(true);
+            rest.onFocus?.(event);
+          }}
+          onBlur={(event) => {
+            setFocused(false);
+            rest.onBlur?.(event);
+          }}
+          aria-label="Номер телефона"
+        />
+      </div>
+      {hasPhone ? (
+        <button
+          type="button"
+          className="phone-field-clear"
+          aria-label="Очистить номер"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={handleClear}
+        >
+          ×
+        </button>
+      ) : null}
+      {required && !hasPhone ? (
+        <input
+          tabIndex={-1}
+          aria-hidden="true"
+          className="person-search-required"
+          value=""
+          required
+          onChange={() => {}}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+export function SearchInput({ value, onChange, className = "", ...rest }) {
   return (
     <input
       {...rest}
-      type="text"
-      inputMode="numeric"
-      autoComplete="off"
-      className={`money-input ${className}`.trim()}
-      value={formatMoneyInput(value)}
-      placeholder={placeholder}
-      onChange={(event) => onChange?.(normalizePriceDigits(event.target.value))}
+      className={className}
+      value={value}
+      onChange={(event) => onChange?.(formatQueryWithPhone(event.target.value))}
     />
   );
 }

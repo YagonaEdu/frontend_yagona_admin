@@ -13,6 +13,7 @@ import {
 import { ROLE_LABELS } from "@/constants";
 import { api, getSession } from "@/services/api/client";
 import { currentMembership } from "@/services/auth";
+import { hasCapability } from "@/utils/roleAccess";
 import { formatDate, formatUzPhone, money, priceToApi, results, today } from "@/utils/format";
 
 const PAYMENT_TYPES = [
@@ -136,7 +137,8 @@ function StatusBadge({ active }) {
 
 export default function StaffPage() {
   const navigate = useNavigate();
-  const canWrite = ["owner", "admin"].includes(currentMembership()?.role);
+  const role = currentMembership()?.role || "";
+  const canWrite = hasCapability(role, "staff.manage");
   const [staff, setStaff] = useState([]);
   const [groups, setGroups] = useState([]);
   const [courses, setCourses] = useState([]);

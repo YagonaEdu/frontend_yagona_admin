@@ -730,7 +730,27 @@ export default function GroupsPage() {
                 ),
               },
               { key: "course", title: "Курс", render: (row) => row.course_name },
-              { key: "teacher", title: "Преподаватель", render: (row) => row.teacher_label },
+              { key: "teacher", title: "Преподаватель", render: (row) => (
+                row.teacher ? (
+                  row.teacher_label
+                ) : (
+                  <span className="groups-no-teacher">
+                    Преподаватель не назначен
+                    {canWrite ? (
+                      <button
+                        type="button"
+                        className="text-action"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          openEdit(row);
+                        }}
+                      >
+                        Назначить
+                      </button>
+                    ) : null}
+                  </span>
+                )
+              ) },
               {
                 key: "students",
                 title: "Ученики",

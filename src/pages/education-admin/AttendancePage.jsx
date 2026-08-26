@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Avatar,
   Badge,
@@ -20,10 +21,10 @@ import {
 } from "@/utils/format";
 
 const ATTENDANCE_STATUSES = [
-  { value: "present", label: "Присутствовал", icon: "✓", chip: "✓ Присутствовал" },
-  { value: "late", label: "Опоздал", icon: "◷", chip: "◷ Опоздал" },
-  { value: "absent", label: "Отсутствовал", icon: "×", chip: "× Отсутствовал" },
-  { value: "excused", label: "Уважительная", icon: "✓", chip: "✓ Уважительная" },
+  { value: "present", label: "Присутствовал", short: "Был", icon: "✓" },
+  { value: "late", label: "Опоздал", short: "Опоздал", icon: "◷" },
+  { value: "absent", label: "Отсутствовал", short: "Нет", icon: "×" },
+  { value: "excused", label: "Уважительная", short: "Уваж.", icon: "✓" },
 ];
 
 const OWNER_KPI = [
@@ -466,121 +467,167 @@ function LessonAttendanceDetail({
       </div>
       <div className="sheet-body attendance-detail-body">
         <Banner>{error}</Banner>
-        <div className="attendance-detail-summary">
-          <div className="attendance-detail-kpis">
-            <div><span>По списку</span><strong>{stats.total}</strong></div>
-            <div><span>Пришли</span><strong>{stats.present}</strong></div>
-            <div><span>Опоздали</span><strong>{stats.late}</strong></div>
-            <div><span>Отсутствовали</span><strong>{stats.absent}</strong></div>
-            <div><span>Уважительная</span><strong>{stats.excused}</strong></div>
-            <div><span>Посещаемость</span><strong>{summaryPct}%</strong></div>
+
+        <div className="att-mark-summary">
+          <div className="att-mark-kpis">
+            <div className="att-mark-kpi">
+              <span>По списку</span>
+              <strong>{stats.total}</strong>
+            </div>
+            <div className="att-mark-kpi tone-present">
+              <span>Пришли</span>
+              <strong>{stats.present}</strong>
+            </div>
+            <div className="att-mark-kpi tone-late">
+              <span>Опоздали</span>
+              <strong>{stats.late}</strong>
+            </div>
+            <div className="att-mark-kpi tone-absent">
+              <span>Нет</span>
+              <strong>{stats.absent}</strong>
+            </div>
+            <div className="att-mark-kpi tone-excused">
+              <span>Уваж.</span>
+              <strong>{stats.excused}</strong>
+            </div>
+            <div className="att-mark-kpi tone-pct">
+              <span>Посещаемость</span>
+              <strong>{summaryPct}%</strong>
+            </div>
           </div>
+
+          <div className="att-mark-progress">
+            <div className="att-mark-progress-head">
+              <span>
+                Отмечено <strong>{stats.marked}</strong> из {stats.total}
+              </span>
+              <span className={stats.marked >= stats.total && stats.total ? "is-done" : ""}>
+                {stats.marked >= stats.total && stats.total ? "Готово" : "Осталось отметить"}
+              </span>
+            </div>
+            <div className="att-mark-progress-bar" aria-hidden="true">
+              <span
+                style={{
+                  width: stats.total ? `${Math.round((stats.marked / stats.total) * 100)}%` : "0%",
+                }}
+              />
+            </div>
+          </div>
+
           {canWrite ? (
-            <div className="attendance-table-actions">
+            <div className="att-mark-actions">
               <Button type="button" busy={busy} disabled={!dirty} onClick={saveAttendance}>
                 Сохранить
               </Button>
               <Button type="button" className="secondary" onClick={markAllPresent}>
-                Отметить всех присутствующими
+                Все присутствуют
               </Button>
             </div>
           ) : null}
         </div>
 
-        <Field label="Фильтр по статусу">
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-            <option value="">Все статусы</option>
-            {ATTENDANCE_STATUSES.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-        </Field>
+        <div className="att-mark-filters" role="tablist" aria-label="Фильтр по статусу">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={!statusFilter}
+            className={!statusFilter ? "is-active" : ""}
+            onClick={() => setStatusFilter("")}
+          >
+            Все ({draftRows.length})
+          </button>
+          {ATTENDANCE_STATUSES.map((item) => {
+            const count = draftRows.filter((row) => row.status === item.value).length;
+            return (
+              <button
+                key={item.value}
+                type="button"
+                role="tab"
+                aria-selected={statusFilter === item.value}
+                className={`tone-${item.value}${statusFilter === item.value ? " is-active" : ""}`}
+                onClick={() => setStatusFilter(item.value)}
+              >
+                {item.short} ({count})
+              </button>
+            );
+          })}
+        </div>
 
-        <div className={`attendance-layout${selectedStudent ? " has-side" : ""}`}>
-          <div className="attendance-table-card attendance-detail-table">
+        <div className={`attendance-layout att-mark-layout${selectedStudent ? " has-side" : ""}`}>
+          <div className="att-mark-list">
             {!visibleRows.length ? (
               <EmptyState title="Нет учеников" body="Измените фильтр или добавьте учеников в группу." />
             ) : (
-              <div className="attendance-table-wrap">
-                <table className="attendance-table">
-                  <thead>
-                    <tr>
-                      <th>Ученик</th>
-                      <th>Статус</th>
-                      <th>Комментарий</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibleRows.map((row) => (
-                      <tr
-                        key={row.student_id}
-                        className={selectedStudentId === row.student_id ? "is-selected" : undefined}
+              visibleRows.map((row) => (
+                <article
+                  key={row.student_id}
+                  className={`att-mark-row${selectedStudentId === row.student_id ? " is-selected" : ""}${
+                    row.status ? ` is-${row.status}` : " is-unmarked"
+                  }`}
+                >
+                  <button
+                    type="button"
+                    className="att-mark-student"
+                    onClick={() => openStudentHistory(row.student_id)}
+                  >
+                    <Avatar name={row.student.full_name} />
+                    <span className="att-mark-student-text">
+                      <strong>{row.student.full_name}</strong>
+                      {row.student.phone ? (
+                        <em>{formatUzPhone(row.student.phone)}</em>
+                      ) : (
+                        <em className="muted">Без телефона</em>
+                      )}
+                    </span>
+                  </button>
+
+                  <div className="att-mark-statuses" role="group" aria-label="Статус посещаемости">
+                    {ATTENDANCE_STATUSES.map((item) => (
+                      <button
+                        key={item.value}
+                        type="button"
+                        disabled={!canWrite}
+                        title={item.label}
+                        aria-label={item.label}
+                        aria-pressed={row.status === item.value}
+                        className={`att-mark-status tone-${item.value}${
+                          row.status === item.value ? " is-active" : ""
+                        }`}
+                        onClick={() => setRowStatus(row.student_id, item.value)}
                       >
-                        <td data-label="Ученик" className="attendance-student-cell">
-                          <button
-                            type="button"
-                            className="attendance-student-btn"
-                            onClick={() => openStudentHistory(row.student_id)}
-                          >
-                            <Avatar name={row.student.full_name} />
-                            <span>
-                              <strong>{row.student.full_name}</strong>
-                              {row.student.phone ? (
-                                <em>{formatUzPhone(row.student.phone)}</em>
-                              ) : null}
-                            </span>
-                          </button>
-                        </td>
-                        <td data-label="Статус" className="attendance-status-cell">
-                          <div className="attendance-statuses" role="group" aria-label="Статус посещаемости">
-                            {ATTENDANCE_STATUSES.map((item) => (
-                              <button
-                                key={item.value}
-                                type="button"
-                                disabled={!canWrite}
-                                title={item.label}
-                                aria-label={item.label}
-                                aria-pressed={row.status === item.value}
-                                className={`attendance-status-btn tone-${item.value}${
-                                  row.status === item.value ? " is-active" : ""
-                                }`}
-                                onClick={() => setRowStatus(row.student_id, item.value)}
-                              >
-                                <span className="attendance-status-icon" aria-hidden="true">
-                                  {item.icon}
-                                </span>
-                                <span className="attendance-status-text">{item.label}</span>
-                              </button>
-                            ))}
-                          </div>
-                        </td>
-                        <td data-label="Комментарий" className="attendance-comment-cell">
-                          {needsComment(row.status) || row.comment ? (
-                            <input
-                              className="attendance-comment"
-                              value={row.comment}
-                              disabled={!canWrite}
-                              placeholder={
-                                needsComment(row.status)
-                                  ? "Причина или комментарий"
-                                  : "Комментарий"
-                              }
-                              onChange={(e) => setRowComment(row.student_id, e.target.value)}
-                            />
-                          ) : (
-                            <span className="attendance-comment-empty muted">Не требуется</span>
-                          )}
-                        </td>
-                      </tr>
+                        <span className="att-mark-status-icon" aria-hidden="true">
+                          {item.icon}
+                        </span>
+                        <span className="att-mark-status-label">{item.short}</span>
+                      </button>
                     ))}
-                  </tbody>
-                </table>
-              </div>
+                  </div>
+
+                  <div className="att-mark-comment-wrap">
+                    {needsComment(row.status) || row.comment ? (
+                      <input
+                        className="att-mark-comment"
+                        value={row.comment}
+                        disabled={!canWrite}
+                        placeholder={
+                          row.status === "late"
+                            ? "На сколько опоздал"
+                            : row.status === "absent"
+                              ? "Причина отсутствия"
+                              : "Комментарий"
+                        }
+                        onChange={(e) => setRowComment(row.student_id, e.target.value)}
+                      />
+                    ) : (
+                      <span className="att-mark-comment-empty">—</span>
+                    )}
+                  </div>
+                </article>
+              ))
             )}
+
             {dirty && canWrite ? (
-              <div className="attendance-savebar">
+              <div className="attendance-savebar att-mark-savebar">
                 <span>Есть несохранённые изменения</span>
                 <Button type="button" busy={busy} onClick={saveAttendance}>
                   Сохранить
@@ -667,6 +714,7 @@ export default function AttendancePage() {
   const role = currentMembership()?.role;
   const isOwnerView = ["owner", "admin"].includes(role);
   const canWrite = role && role !== "student";
+  const [searchParams] = useSearchParams();
 
   const [loading, setLoading] = useState(true);
   const [statsLoading, setStatsLoading] = useState(false);
@@ -785,6 +833,13 @@ export default function AttendancePage() {
     if (loading) return;
     refreshAttendanceCache();
   }, [loading, refreshAttendanceCache]);
+
+  useEffect(() => {
+    const lessonId = searchParams.get("lesson");
+    if (!lessonId || loading) return;
+    const exists = lessons.some((item) => String(item.id) === String(lessonId));
+    if (exists) setDetailLessonId(lessonId);
+  }, [searchParams, lessons, loading]);
 
   const allDashboardRows = useMemo(() => {
     return periodLessons.map((lesson) => {
@@ -1372,7 +1427,7 @@ export default function AttendancePage() {
             aria-label="Закрыть"
             onClick={() => setDetailLessonId("")}
           />
-          <div className="sheet sheet-wide">
+          <div className="sheet sheet-wide attendance-mark-sheet">
             <LessonAttendanceDetail
               lesson={detailLesson}
               groupMap={groupMap}

@@ -14,14 +14,16 @@ export function YagonaLogo({ size = 88, alt = "Yagona", className = "", mark = f
   );
 }
 
-export function BrandMark({ title = "Yagona", subtitle, compact = false }) {
+export function BrandMark({ title = "Yagona", subtitle, compact = false, iconOnly = false }) {
   return (
-    <div className={compact ? "brand-mark compact" : "brand-mark"}>
-      <YagonaLogo size={compact ? 28 : 32} mark />
-      <div>
-        <strong>{title}</strong>
-        {subtitle ? <span>{subtitle}</span> : null}
-      </div>
+    <div className={`brand-mark${compact ? " compact" : ""}${iconOnly ? " icon-only" : ""}`.trim()}>
+      <YagonaLogo size={compact || iconOnly ? 28 : 32} mark />
+      {iconOnly ? null : (
+        <div>
+          <strong>{title}</strong>
+          {subtitle ? <span>{subtitle}</span> : null}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Banner,
   Badge,
@@ -185,6 +186,7 @@ function scheduleErrorMessage(err) {
 
 export default function SchedulePage() {
   const canWrite = currentMembership()?.role !== "teacher";
+  const [searchParams] = useSearchParams();
   const [view, setView] = useState("week");
   const [anchorDate, setAnchorDate] = useState(today());
   const [narrow, setNarrow] = useState(false);
@@ -199,16 +201,29 @@ export default function SchedulePage() {
   const [info, setInfo] = useState("");
   const [formError, setFormError] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [teacherFilter, setTeacherFilter] = useState("");
+  const [teacherFilter, setTeacherFilter] = useState(searchParams.get("teacher") || "");
   const [groupFilter, setGroupFilter] = useState("");
   const [courseFilter, setCourseFilter] = useState("");
-  const [roomFilter, setRoomFilter] = useState("");
+  const [roomFilter, setRoomFilter] = useState(searchParams.get("room") || "");
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [selectedId, setSelectedId] = useState("");
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+
+  useEffect(() => {
+    const teacherFromUrl = searchParams.get("teacher") || "";
+    const roomFromUrl = searchParams.get("room") || "";
+    if (teacherFromUrl) {
+      setTeacherFilter(teacherFromUrl);
+      setFiltersOpen(true);
+    }
+    if (roomFromUrl) {
+      setRoomFilter(roomFromUrl);
+      setFiltersOpen(true);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 768px)");
@@ -553,11 +568,30 @@ export default function SchedulePage() {
             required
           >
             <option value="">Выберите преподавателя</option>
-            {staff.map((item) => (
-              <option key={item.id} value={item.id}>
-                {staffLabel(staff, item.id)}
-              </option>
-            ))}
+            {staff
+              .filter((item) => item.role === "teacher" || !item.role)
+              .map((item) => {
+                let avail = "Свободен";
+                if (values.date && values.start_time && values.end_time) {
+                  const startAt = combineDateTime(values.date, values.start_time).getTime();
+                  const endAt = combineDateTime(values.date, values.end_time).getTime();
+                  const conflict = lessons.find((l) => {
+                    if (String(l.teacher) !== String(item.id) || l.status === "cancelled") return false;
+                    if (values.id && String(l.id) === String(values.id)) return false;
+                    const a = new Date(l.starts_at).getTime();
+                    const b = new Date(l.ends_at).getTime();
+                    return a < endAt && b > startAt;
+                  });
+                  if (conflict) {
+                    avail = `Занят ${formatTime(conflict.starts_at)}–${formatTime(conflict.ends_at)}`;
+                  }
+                }
+                return (
+                  <option key={item.id} value={item.id}>
+                    {staffLabel(staff, item.id)} · {avail}
+                  </option>
+                );
+              })}
           </select>
         </Field>
         <Field label="Дата">

@@ -11,6 +11,7 @@ import {
 import { ROLE_LABELS } from "@/constants";
 import { api, getSession } from "@/services/api/client";
 import { currentMembership } from "@/services/auth";
+import { hasCapability } from "@/utils/roleAccess";
 import { formatDate, money, priceToApi, results, today } from "@/utils/format";
 
 const PAYMENT_TYPES = [
@@ -242,7 +243,8 @@ function FinanceBars({ points, currency }) {
 export default function FinancePage() {
   const slug = getSession().tenantSlug;
   const base = slug ? `/education/${slug}` : "..";
-  const canWrite = ["owner", "admin"].includes(currentMembership()?.role);
+  const role = currentMembership()?.role || "";
+  const canWrite = hasCapability(role, "finance.manage");
   const [pageTab, setPageTab] = useState("overview");
   const [selectedMonth, setSelectedMonth] = useState(currentMonthValue());
   const [loading, setLoading] = useState(true);

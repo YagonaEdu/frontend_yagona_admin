@@ -1,33 +1,16 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import PageFallback from "@/components/layout/PageFallback";
 import { useAuth } from "@/hooks/useAuth";
 import AuthLayout from "@/layouts/AuthLayout";
 import EducationAdminLayout from "@/layouts/EducationAdminLayout";
 import SuperAdminLayout from "@/layouts/SuperAdminLayout";
 import LoginPage from "@/pages/auth/LoginPage";
-import EduDashboardPage from "@/pages/education-admin/DashboardPage";
-import CrmPage from "@/pages/education-admin/CrmPage";
-import StudentsPage from "@/pages/education-admin/StudentsPage";
-import CoursesPage from "@/pages/education-admin/CoursesPage";
-import GroupsPage from "@/pages/education-admin/GroupsPage";
-import SchedulePage from "@/pages/education-admin/SchedulePage";
-import AttendancePage from "@/pages/education-admin/AttendancePage";
-import BillingPage from "@/pages/education-admin/BillingPage";
-import FinancePage from "@/pages/education-admin/FinancePage";
-import StaffPage from "@/pages/education-admin/StaffPage";
-import NotificationsPage from "@/pages/education-admin/NotificationsPage";
-import SettingsPage from "@/pages/education-admin/SettingsPage";
-import SuperDashboardPage from "@/pages/super-admin/DashboardPage";
-import CentersPage from "@/pages/super-admin/CentersPage";
-import PlatformStudentsPage from "@/pages/super-admin/StudentsPage";
-import PlansPage from "@/pages/super-admin/PlansPage";
-import LicensesPage from "@/pages/super-admin/LicensesPage";
-import WalletPage from "@/pages/super-admin/WalletPage";
-import AnalyticsPage from "@/pages/super-admin/AnalyticsPage";
 import { APP_MODES } from "@/constants";
 import { clearSession, setSession } from "@/services/api/client";
 import {
   canAccessSuperAdmin,
+  currentMembership,
   logout as doLogout,
 } from "@/services/auth";
 import {
@@ -37,11 +20,72 @@ import {
   parseEducationSubdomain,
   resolveAuthedHome,
 } from "@/utils/routes";
+import { canAccessEducationSegment, isTeacherRole } from "@/utils/roleAccess";
+
+const EduDashboardPage = lazy(() => import("@/pages/education-admin/DashboardPage"));
+const CrmPage = lazy(() => import("@/pages/education-admin/CrmPage"));
+const StudentsPage = lazy(() => import("@/pages/education-admin/StudentsPage"));
+const CoursesPage = lazy(() => import("@/pages/education-admin/CoursesPage"));
+const GroupsPage = lazy(() => import("@/pages/education-admin/GroupsPage"));
+const RoomsPage = lazy(() => import("@/pages/education-admin/RoomsPage"));
+const SchedulePage = lazy(() => import("@/pages/education-admin/SchedulePage"));
+const AttendancePage = lazy(() => import("@/pages/education-admin/AttendancePage"));
+const BillingPage = lazy(() => import("@/pages/education-admin/BillingPage"));
+const FinancePage = lazy(() => import("@/pages/education-admin/FinancePage"));
+const StaffPage = lazy(() => import("@/pages/education-admin/StaffPage"));
+const NotificationsPage = lazy(() => import("@/pages/education-admin/NotificationsPage"));
+const SettingsPage = lazy(() => import("@/pages/education-admin/SettingsPage"));
+const ReceptionTasksPage = lazy(() => import("@/pages/education-admin/resepshen_yagona/TasksPage"));
+const TeachersPage = lazy(() => import("@/pages/education-admin/resepshen_yagona/TeachersPage"));
+const TrialsPage = lazy(() => import("@/pages/education-admin/resepshen_yagona/TrialsPage"));
+const TeacherDashboard = lazy(() => import("@/pages/education-admin/teachers_account"));
+const TeacherGroupsPage = lazy(() => import("@/pages/education-admin/teachers_account/GroupsPage"));
+const TeacherStudentsPage = lazy(() => import("@/pages/education-admin/teachers_account/StudentsPage"));
+const TeacherSchedulePage = lazy(() => import("@/pages/education-admin/teachers_account/SchedulePage"));
+const TeacherAttendancePage = lazy(() => import("@/pages/education-admin/teachers_account/AttendancePage"));
+const TeacherAssignmentsPage = lazy(() => import("@/pages/education-admin/teachers_account/AssignmentsPage"));
+const TeacherResultsPage = lazy(() => import("@/pages/education-admin/teachers_account/ResultsPage"));
+const TeacherMaterialsPage = lazy(() => import("@/pages/education-admin/teachers_account/MaterialsPage"));
+const TeacherNotificationsPage = lazy(() => import("@/pages/education-admin/teachers_account/NotificationsPage"));
+const TeacherProfilePage = lazy(() => import("@/pages/education-admin/teachers_account/ProfilePage"));
+const SuperDashboardPage = lazy(() => import("@/pages/super-admin/DashboardPage"));
+const CentersPage = lazy(() => import("@/pages/super-admin/CentersPage"));
+const PlatformStudentsPage = lazy(() => import("@/pages/super-admin/StudentsPage"));
+const PlansPage = lazy(() => import("@/pages/super-admin/PlansPage"));
+const LicensesPage = lazy(() => import("@/pages/super-admin/LicensesPage"));
+const WalletPage = lazy(() => import("@/pages/super-admin/WalletPage"));
+const AnalyticsPage = lazy(() => import("@/pages/super-admin/AnalyticsPage"));
+
+function LazyPage({ children }) {
+  return <Suspense fallback={<PageFallback />}>{children}</Suspense>;
+}
+
+function RoleGuard({ session, segment, children }) {
+  const membership = findMembershipBySlug(
+    session,
+    parseEducationSlug(window.location.pathname),
+  ) || currentMembership(session);
+  const role = membership?.role || "owner";
+  if (!canAccessEducationSegment(role, segment)) {
+    return <Navigate to={educationHomePath(membership?.tenant_slug || "")} replace />;
+  }
+  return children;
+}
+
+function TeacherSwitch({ session, teacher, children }) {
+  const membership = findMembershipBySlug(
+    session,
+    parseEducationSlug(window.location.pathname),
+  ) || currentMembership(session);
+  if (isTeacherRole(membership?.role || "")) {
+    return teacher;
+  }
+  return children;
+}
 
 function RootRedirect({ session }) {
   const home = resolveAuthedHome(session);
 
-  // Only wipe a fully-loaded but unusable session (not mid-login).
   useEffect(() => {
     if (home) return;
     if (!session.access || !session.user) return;
@@ -71,10 +115,22 @@ export default function App() {
   const activeSlug = urlSlug || hostSlug;
 
   useEffect(() => {
+    const onAuthExpired = () => {
+      navigate("/login", { replace: true });
+    };
+    window.addEventListener("yagona-auth-expired", onAuthExpired);
+    return () => window.removeEventListener("yagona-auth-expired", onAuthExpired);
+  }, [navigate]);
+
+  useEffect(() => {
     if (session.access && !session.user) {
       clearSession();
     }
   }, [session.access, session.user]);
+
+  const membershipIdsKey = (session.memberships || [])
+    .map((item) => `${item.id}:${item.tenant_slug}`)
+    .join("|");
 
   useEffect(() => {
     if (!authed || !activeSlug) return;
@@ -101,6 +157,8 @@ export default function App() {
     ) {
       setSession({ mode: APP_MODES.EDUCATION_ADMIN });
     }
+    // membershipIdsKey tracks membership identity without depending on array reference.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     authed,
     activeSlug,
@@ -108,7 +166,7 @@ export default function App() {
     session.tenantId,
     session.tenantSlug,
     session.user?.is_superuser,
-    session.memberships,
+    membershipIdsKey,
   ]);
 
   useEffect(() => {
@@ -143,7 +201,9 @@ export default function App() {
           path="/super"
           element={
             canAccessSuperAdmin(session) ? (
-              <SuperDashboardPage />
+              <LazyPage>
+                <SuperDashboardPage />
+              </LazyPage>
             ) : (
               <Navigate to={resolveAuthedHome(session) || "/login"} replace />
             )
@@ -151,13 +211,23 @@ export default function App() {
         />
         <Route
           path="/super/centers"
-          element={canAccessSuperAdmin(session) ? <CentersPage /> : <Navigate to="/login" replace />}
+          element={
+            canAccessSuperAdmin(session) ? (
+              <LazyPage>
+                <CentersPage />
+              </LazyPage>
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
         />
         <Route
           path="/super/students"
           element={
             canAccessSuperAdmin(session) ? (
-              <PlatformStudentsPage />
+              <LazyPage>
+                <PlatformStudentsPage />
+              </LazyPage>
             ) : (
               <Navigate to="/login" replace />
             )
@@ -165,22 +235,50 @@ export default function App() {
         />
         <Route
           path="/super/plans"
-          element={canAccessSuperAdmin(session) ? <PlansPage /> : <Navigate to="/login" replace />}
+          element={
+            canAccessSuperAdmin(session) ? (
+              <LazyPage>
+                <PlansPage />
+              </LazyPage>
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
         />
         <Route
           path="/super/licenses"
           element={
-            canAccessSuperAdmin(session) ? <LicensesPage /> : <Navigate to="/login" replace />
+            canAccessSuperAdmin(session) ? (
+              <LazyPage>
+                <LicensesPage />
+              </LazyPage>
+            ) : (
+              <Navigate to="/login" replace />
+            )
           }
         />
         <Route
           path="/super/wallet"
-          element={canAccessSuperAdmin(session) ? <WalletPage /> : <Navigate to="/login" replace />}
+          element={
+            canAccessSuperAdmin(session) ? (
+              <LazyPage>
+                <WalletPage />
+              </LazyPage>
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
         />
         <Route
           path="/super/analytics"
           element={
-            canAccessSuperAdmin(session) ? <AnalyticsPage /> : <Navigate to="/login" replace />
+            canAccessSuperAdmin(session) ? (
+              <LazyPage>
+                <AnalyticsPage />
+              </LazyPage>
+            ) : (
+              <Navigate to="/login" replace />
+            )
           }
         />
       </Route>
@@ -189,18 +287,260 @@ export default function App() {
         path="/education/:tenantSlug"
         element={<EducationAdminLayout session={session} onLogout={onLogout} />}
       >
-        <Route index element={<EduDashboardPage />} />
-        <Route path="crm" element={<CrmPage />} />
-        <Route path="students" element={<StudentsPage />} />
-        <Route path="courses" element={<CoursesPage />} />
-        <Route path="groups" element={<GroupsPage />} />
-        <Route path="schedule" element={<SchedulePage />} />
-        <Route path="attendance" element={<AttendancePage />} />
-        <Route path="billing" element={<BillingPage />} />
-        <Route path="finance" element={<FinancePage />} />
-        <Route path="staff" element={<StaffPage />} />
-        <Route path="notifications" element={<NotificationsPage />} />
-        <Route path="settings" element={<SettingsPage />} />
+        <Route
+          index
+          element={
+            <RoleGuard session={session} segment="">
+              <TeacherSwitch
+                session={session}
+                teacher={
+                  <LazyPage>
+                    <TeacherDashboard />
+                  </LazyPage>
+                }
+              >
+                <LazyPage>
+                  <EduDashboardPage />
+                </LazyPage>
+              </TeacherSwitch>
+            </RoleGuard>
+          }
+        />
+        <Route
+          path="crm"
+          element={
+            <RoleGuard session={session} segment="crm">
+              <LazyPage>
+                <CrmPage />
+              </LazyPage>
+            </RoleGuard>
+          }
+        />
+        <Route
+          path="students"
+          element={
+            <RoleGuard session={session} segment="students">
+              <TeacherSwitch
+                session={session}
+                teacher={
+                  <LazyPage>
+                    <TeacherStudentsPage />
+                  </LazyPage>
+                }
+              >
+                <LazyPage>
+                  <StudentsPage />
+                </LazyPage>
+              </TeacherSwitch>
+            </RoleGuard>
+          }
+        />
+        <Route
+          path="trials"
+          element={
+            <RoleGuard session={session} segment="trials">
+              <LazyPage>
+                <TrialsPage />
+              </LazyPage>
+            </RoleGuard>
+          }
+        />
+        <Route
+          path="courses"
+          element={
+            <RoleGuard session={session} segment="courses">
+              <LazyPage>
+                <CoursesPage />
+              </LazyPage>
+            </RoleGuard>
+          }
+        />
+        <Route
+          path="groups"
+          element={
+            <RoleGuard session={session} segment="groups">
+              <TeacherSwitch
+                session={session}
+                teacher={
+                  <LazyPage>
+                    <TeacherGroupsPage />
+                  </LazyPage>
+                }
+              >
+                <LazyPage>
+                  <GroupsPage />
+                </LazyPage>
+              </TeacherSwitch>
+            </RoleGuard>
+          }
+        />
+        <Route
+          path="rooms"
+          element={
+            <RoleGuard session={session} segment="rooms">
+              <LazyPage>
+                <RoomsPage />
+              </LazyPage>
+            </RoleGuard>
+          }
+        />
+        <Route
+          path="teachers"
+          element={
+            <RoleGuard session={session} segment="teachers">
+              <LazyPage>
+                <TeachersPage />
+              </LazyPage>
+            </RoleGuard>
+          }
+        />
+        <Route
+          path="schedule"
+          element={
+            <RoleGuard session={session} segment="schedule">
+              <TeacherSwitch
+                session={session}
+                teacher={
+                  <LazyPage>
+                    <TeacherSchedulePage />
+                  </LazyPage>
+                }
+              >
+                <LazyPage>
+                  <SchedulePage />
+                </LazyPage>
+              </TeacherSwitch>
+            </RoleGuard>
+          }
+        />
+        <Route
+          path="attendance"
+          element={
+            <RoleGuard session={session} segment="attendance">
+              <TeacherSwitch
+                session={session}
+                teacher={
+                  <LazyPage>
+                    <TeacherAttendancePage />
+                  </LazyPage>
+                }
+              >
+                <LazyPage>
+                  <AttendancePage />
+                </LazyPage>
+              </TeacherSwitch>
+            </RoleGuard>
+          }
+        />
+        <Route
+          path="assignments"
+          element={
+            <RoleGuard session={session} segment="assignments">
+              <LazyPage>
+                <TeacherAssignmentsPage />
+              </LazyPage>
+            </RoleGuard>
+          }
+        />
+        <Route
+          path="results"
+          element={
+            <RoleGuard session={session} segment="results">
+              <LazyPage>
+                <TeacherResultsPage />
+              </LazyPage>
+            </RoleGuard>
+          }
+        />
+        <Route
+          path="materials"
+          element={
+            <RoleGuard session={session} segment="materials">
+              <LazyPage>
+                <TeacherMaterialsPage />
+              </LazyPage>
+            </RoleGuard>
+          }
+        />
+        <Route
+          path="billing"
+          element={
+            <RoleGuard session={session} segment="billing">
+              <LazyPage>
+                <BillingPage />
+              </LazyPage>
+            </RoleGuard>
+          }
+        />
+        <Route
+          path="finance"
+          element={
+            <RoleGuard session={session} segment="finance">
+              <LazyPage>
+                <FinancePage />
+              </LazyPage>
+            </RoleGuard>
+          }
+        />
+        <Route
+          path="staff"
+          element={
+            <RoleGuard session={session} segment="staff">
+              <LazyPage>
+                <StaffPage />
+              </LazyPage>
+            </RoleGuard>
+          }
+        />
+        <Route
+          path="notifications"
+          element={
+            <RoleGuard session={session} segment="notifications">
+              <TeacherSwitch
+                session={session}
+                teacher={
+                  <LazyPage>
+                    <TeacherNotificationsPage />
+                  </LazyPage>
+                }
+              >
+                <LazyPage>
+                  <NotificationsPage />
+                </LazyPage>
+              </TeacherSwitch>
+            </RoleGuard>
+          }
+        />
+        <Route
+          path="tasks"
+          element={
+            <RoleGuard session={session} segment="tasks">
+              <LazyPage>
+                <ReceptionTasksPage />
+              </LazyPage>
+            </RoleGuard>
+          }
+        />
+        <Route
+          path="profile"
+          element={
+            <RoleGuard session={session} segment="profile">
+              <LazyPage>
+                <TeacherProfilePage />
+              </LazyPage>
+            </RoleGuard>
+          }
+        />
+        <Route
+          path="settings"
+          element={
+            <RoleGuard session={session} segment="settings">
+              <LazyPage>
+                <SettingsPage />
+              </LazyPage>
+            </RoleGuard>
+          }
+        />
       </Route>
 
       <Route path="/login" element={<AuthedLoginRedirect session={session} />} />

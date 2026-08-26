@@ -8,16 +8,23 @@ export function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function currencyLabel(currency = "UZS") {
+  const code = String(currency || "UZS").toUpperCase();
+  if (code === "UZS" || code === "SUM" || code === "SOM") return "сум";
+  return currency || "сум";
+}
+
 export function money(value, currency = "UZS") {
   if (value == null || value === "") return "—";
   const amount = Number(value);
-  if (Number.isNaN(amount)) return `${value} ${currency}`;
+  const label = currencyLabel(currency);
+  if (Number.isNaN(amount)) return `${value} ${label}`;
   const fraction = Number.isInteger(amount) ? 0 : 2;
   const formatted = amount.toLocaleString("ru-RU", {
     minimumFractionDigits: fraction,
     maximumFractionDigits: fraction,
   });
-  return `${formatted} ${currency}`;
+  return `${formatted} ${label}`;
 }
 
 export function normalizePriceDigits(value) {
@@ -36,7 +43,11 @@ export function normalizePriceDigits(value) {
 export function formatMoneyInput(value) {
   const raw = normalizePriceDigits(value);
   if (!raw) return "";
-  return Number(raw).toLocaleString("en-US");
+  return Number(raw).toLocaleString("ru-RU", { maximumFractionDigits: 0 });
+}
+
+export function moneyInputSuffix(currency = "UZS") {
+  return currencyLabel(currency);
 }
 
 export function priceToApi(value) {
@@ -118,21 +129,52 @@ export function looksLikeEmail(value) {
   return /[a-zA-Z@]/.test(String(value || ""));
 }
 
-/** Display mask: +998 99 999 99 99 */
-export function formatUzPhone(value) {
+export function uzPhoneLocalDigits(value) {
   const digits = String(value || "").replace(/\D/g, "");
   if (!digits) return "";
+  return (digits.startsWith("998") ? digits.slice(3) : digits).slice(0, 9);
+}
 
-  let local = digits.startsWith("998") ? digits.slice(3) : digits;
-  local = local.slice(0, 9);
-
+export function formatUzPhoneLocal(value) {
+  const local = uzPhoneLocalDigits(value);
   const parts = [];
   if (local.length > 0) parts.push(local.slice(0, 2));
   if (local.length > 2) parts.push(local.slice(2, 5));
   if (local.length > 5) parts.push(local.slice(5, 7));
   if (local.length > 7) parts.push(local.slice(7, 9));
+  return parts.join(" ");
+}
 
-  return parts.length ? `+998 ${parts.join(" ")}` : "+998";
+/** Display mask: +998 99 999 99 99 */
+export function formatUzPhone(value) {
+  const local = formatUzPhoneLocal(value);
+  if (!local) return "";
+  return `+998 ${local}`;
+}
+
+/** API/storage: +998XXXXXXXXX */
+export function toApiPhone(value) {
+  const local = uzPhoneLocalDigits(value);
+  if (!local) return null;
+  return `+998${local}`;
+}
+
+export function isPhoneLikeQuery(value) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return false;
+  if (looksLikeEmail(trimmed)) return false;
+  if (/^[+\d(]/.test(trimmed)) return true;
+  if (/\d/.test(trimmed) && !/[a-zA-Zа-яА-ЯёЁ]/.test(trimmed)) return true;
+  return false;
+}
+
+/** Mixed search fields: format phone queries, keep names/emails as typed. */
+export function formatQueryWithPhone(value) {
+  const trimmed = String(value || "");
+  if (!trimmed) return "";
+  if (looksLikeEmail(trimmed)) return trimmed;
+  if (isPhoneLikeQuery(trimmed)) return formatUzPhone(trimmed);
+  return value;
 }
 
 /** Value for API login: +998XXXXXXXXX or email as-is. */
@@ -141,8 +183,6 @@ export function toLoginIdentifier(value) {
   if (!trimmed) return "";
   if (looksLikeEmail(trimmed)) return trimmed;
 
-  const digits = trimmed.replace(/\D/g, "");
-  if (!digits || digits === "998") return "";
-  const withCode = digits.startsWith("998") ? digits : `998${digits}`;
-  return `+${withCode}`;
+  const apiPhone = toApiPhone(trimmed);
+  return apiPhone || "";
 }

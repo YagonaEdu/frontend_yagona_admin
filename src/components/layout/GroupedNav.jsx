@@ -1,6 +1,7 @@
 import { NavLink } from "react-router-dom";
+import { NavIcon } from "./navIcons";
 
-export function GroupedNav({ items }) {
+export function GroupedNav({ items, collapsed = false }) {
   const groups = [];
   for (const item of items) {
     const name = item.group || "Меню";
@@ -13,13 +14,20 @@ export function GroupedNav({ items }) {
   }
 
   return (
-    <nav className="nav" aria-label="Основное меню">
+    <nav className={`nav${collapsed ? " is-collapsed" : ""}`} aria-label="Основное меню">
       {groups.map((group) => (
         <div className="nav-group" key={group.name}>
-          <div className="nav-group-label">{group.name}</div>
+          {!collapsed ? <div className="nav-group-label">{group.name}</div> : null}
           {group.items.map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.end}>
-              {item.label}
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              title={collapsed ? item.label : undefined}
+              className={collapsed ? "nav-link-icon" : undefined}
+            >
+              <NavIcon segment={item.segment} size={18} />
+              {!collapsed ? <span className="nav-link-label">{item.label}</span> : null}
             </NavLink>
           ))}
         </div>

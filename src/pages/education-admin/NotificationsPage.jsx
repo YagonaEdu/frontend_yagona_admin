@@ -20,7 +20,7 @@ const TYPE_OPTIONS = [
 
 const TYPE_META = {
   announcement: { label: "Объявления", icon: "✉", tone: "blue" },
-  payment: { label: "Платежи", icon: "₽", tone: "green" },
+  payment: { label: "Платежи", icon: "сум", tone: "green" },
   attendance: { label: "Посещаемость", icon: "✓", tone: "blue" },
   crm: { label: "CRM", icon: "◎", tone: "purple" },
   schedule: { label: "Расписание", icon: "◷", tone: "blue" },

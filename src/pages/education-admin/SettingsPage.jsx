@@ -1,11 +1,16 @@
+import { lazy, Suspense } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Banner, Button, Field, PageHeader } from "@/components/ui";
+import PageFallback from "@/components/layout/PageFallback";
 import { CYCLE_LABELS, LICENSE_LABELS, ROLE_LABELS } from "@/constants";
 import { api, getSession } from "@/services/api/client";
 import { currentMembership } from "@/services/auth";
 import { formatDate, money } from "@/utils/format";
+import { isAdminRole } from "@/utils/roleAccess";
 
-const SECTIONS = [
+const AdminSettingsPage = lazy(() => import("./resepshen_yagona/AdminSettingsPage"));
+
+const ALL_SECTIONS = [
   { id: "plan", label: "Тариф Yagona" },
   { id: "documents", label: "Договор и документы" },
   { id: "general", label: "Общие" },
@@ -96,7 +101,21 @@ function clone(value) {
 export default function SettingsPage() {
   const session = getSession();
   const membership = currentMembership(session);
+  if (isAdminRole(membership?.role)) {
+    return (
+      <Suspense fallback={<PageFallback label="Загрузка настроек…" />}>
+        <AdminSettingsPage />
+      </Suspense>
+    );
+  }
+  return <OwnerSettingsPage />;
+}
+
+function OwnerSettingsPage() {
+  const session = getSession();
+  const membership = currentMembership(session);
   const canEdit = membership?.role === "owner" || membership?.role === "admin";
+  const SECTIONS = ALL_SECTIONS;
 
   const [section, setSection] = useState("plan");
   const [loading, setLoading] = useState(true);

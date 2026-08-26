@@ -1,5 +1,6 @@
 import { getSession } from "@/services/api/client";
 import { APP_MODES } from "@/constants";
+import { filterEducationNav } from "./roleAccess";
 
 /** /education/inha/crm → inha */
 export function parseEducationSlug(pathname = "") {
@@ -70,7 +71,7 @@ export function resolveEducationSlug(session = getSession(), pathname = "", host
 }
 
 export function buildEducationNav(role, slug, navMap) {
-  const items = navMap[role] || navMap.owner;
+  const items = filterEducationNav(role, navMap[role] || navMap.owner);
   return items.map((item) => ({
     ...item,
     to: item.segment ? educationSegmentPath(slug, item.segment) : educationHomePath(slug),

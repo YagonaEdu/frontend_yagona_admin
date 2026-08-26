@@ -1,8 +1,43 @@
 const API_ROOT = String(import.meta.env.VITE_API_BASE || "/api/v1").replace(/\/+$/, "");
+const GET_CACHE_TTL_MS = 15000;
+const getCache = new Map();
+let refreshPromise = null;
 
 function apiUrl(path) {
   const suffix = `/${String(path || "").replace(/^\/+/, "")}`;
   return `${API_ROOT}${suffix}`;
+}
+
+function cacheKey(path, tenantId) {
+  return `${tenantId || "no-tenant"}:${path}`;
+}
+
+function readCache(key) {
+  const hit = getCache.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.at > GET_CACHE_TTL_MS) {
+    getCache.delete(key);
+    return null;
+  }
+  return hit.data;
+}
+
+function writeCache(key, data) {
+  getCache.set(key, { at: Date.now(), data });
+}
+
+export function invalidateApiCache(prefix = "") {
+  if (!prefix) {
+    getCache.clear();
+    return;
+  }
+  for (const key of getCache.keys()) {
+    if (key.includes(prefix)) getCache.delete(key);
+  }
+}
+
+function notifyAuthExpired() {
+  window.dispatchEvent(new Event("yagona-auth-expired"));
 }
 
 export class ApiError extends Error {
@@ -15,7 +50,7 @@ export class ApiError extends Error {
 
 function formatMessage(status, payload) {
   if (!payload) return `Ошибка ${status}`;
-  const message = payload.message || `Ошибка ${status}`;
+  const message = payload.message || payload.detail || `Ошибка ${status}`;
   if (message && !String(message).includes("ErrorDetail")) return message;
   const details = flattenDetails(payload.details);
   return details || message || `Ошибка ${status}`;
@@ -24,7 +59,9 @@ function formatMessage(status, payload) {
 function flattenDetails(details) {
   if (!details) return "";
   if (typeof details === "string") return details;
-  if (Array.isArray(details)) return details.map((item) => flattenDetails(item)).filter(Boolean).join(", ");
+  if (Array.isArray(details)) {
+    return details.map((item) => flattenDetails(item)).filter(Boolean).join(", ");
+  }
   if (typeof details === "object") {
     return Object.entries(details)
       .map(([key, value]) => {
@@ -45,6 +82,7 @@ function fieldLabel(key) {
     membership: "Сотрудник",
     period: "Период",
     status: "Статус",
+    tenant: "Учебный центр",
   };
   return labels[key] || key;
 }
@@ -61,20 +99,39 @@ async function parseBody(response) {
 }
 
 async function refreshAccess() {
-  const { refresh } = getSession();
-  if (!refresh) return false;
-  const response = await fetch(apiUrl("/auth/refresh"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refresh }),
-  });
-  const data = await parseBody(response);
-  if (!response.ok) {
-    clearSession();
-    return false;
-  }
-  setSession({ access: data.access, refresh: data.refresh || refresh });
-  return true;
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = (async () => {
+    const { refresh } = getSession();
+    if (!refresh) return false;
+
+    try {
+      const response = await fetch(apiUrl("/auth/refresh"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh }),
+      });
+      const data = await parseBody(response);
+      if (!response.ok) {
+        clearSession();
+        notifyAuthExpired();
+        return false;
+      }
+      setSessionSilent({
+        access: data.access,
+        refresh: data.refresh || refresh,
+      });
+      return true;
+    } catch {
+      clearSession();
+      notifyAuthExpired();
+      return false;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
 }
 
 function safeJsonParse(raw, fallback) {
@@ -136,16 +193,36 @@ export function clearSession() {
   ["access", "refresh", "tenantId", "tenantSlug", "mode", "user", "memberships"].forEach((key) =>
     localStorage.removeItem(key),
   );
+  getCache.clear();
+  refreshPromise = null;
   window.dispatchEvent(new Event("yagona-session"));
 }
 
-export async function request(path, { method = "GET", body, tenant = true, retry = true } = {}) {
+export async function request(
+  path,
+  { method = "GET", body, tenant = true, retry = true, cache = false } = {},
+) {
   const session = getSession();
+
+  if (tenant && !session.tenantId) {
+    throw new ApiError(400, {
+      message: "Учебный центр не выбран. Войдите снова.",
+      details: { tenant: "X-Tenant-ID header is required." },
+    });
+  }
+
   const headers = { Accept: "application/json" };
   const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
   if (body !== undefined && !isFormData) headers["Content-Type"] = "application/json";
   if (session.access) headers.Authorization = `Bearer ${session.access}`;
   if (tenant && session.tenantId) headers["X-Tenant-ID"] = session.tenantId;
+
+  const isGet = method === "GET";
+  const key = cacheKey(path, tenant ? session.tenantId : "");
+  if (isGet && cache) {
+    const cached = readCache(key);
+    if (cached !== null) return cached;
+  }
 
   const response = await fetch(apiUrl(path), {
     method,
@@ -154,13 +231,26 @@ export async function request(path, { method = "GET", body, tenant = true, retry
       body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
   });
 
-  if (response.status === 401 && retry && session.refresh) {
-    const ok = await refreshAccess();
-    if (ok) return request(path, { method, body, tenant, retry: false });
+  if (response.status === 401 && retry) {
+    const live = getSession();
+    if (live.refresh) {
+      const ok = await refreshAccess();
+      if (ok) {
+        return request(path, { method, body, tenant, retry: false, cache });
+      }
+      throw new ApiError(401, { message: "Сессия истекла. Войдите снова." });
+    }
+    clearSession();
+    notifyAuthExpired();
+    throw new ApiError(401, { message: "Требуется авторизация." });
   }
 
   const data = await parseBody(response);
   if (!response.ok) throw new ApiError(response.status, data);
+
+  if (isGet && cache) writeCache(key, data);
+  if (!isGet) invalidateApiCache(tenant ? session.tenantId : "");
+
   return data;
 }
 
